@@ -1,9 +1,6 @@
 package com.example.devlog.project;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -11,7 +8,13 @@ import java.util.UUID;
 
 @Getter
 @Entity
-@Table(name = "projects")
+@Table(
+        name = "projects",
+        indexes = {
+                @Index(name = "idx_projects_deleted_created_at", columnList = "deleted, created_at"),
+                @Index(name = "idx_projects_name", columnList = "name")
+        }
+)
 public class Project {
 
     @Id
@@ -24,8 +27,9 @@ public class Project {
     @Column(length = 1000)
     private String description;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30, columnDefinition = "VARCHAR(30) DEFAULT 'ACTIVE'")
-    private String status;
+    private ProjectStatus status;
 
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
     private boolean deleted;
@@ -36,14 +40,13 @@ public class Project {
 
     private LocalDateTime updatedAt;
 
-
     protected Project() {}
 
     private Project(String name, String description) {
         this.id = UUID.randomUUID().toString();
         this.name = name;
         this.description = description;
-        this.status = "ACTIVE";
+        this.status = ProjectStatus.ACTIVE;
         this.deleted = false;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = null;
@@ -64,7 +67,7 @@ public class Project {
         this.deletedAt = LocalDateTime.now();
     }
 
-    public void updateStatus(String status) {
+    public void updateStatus(ProjectStatus status) {
         this.status = status;
         this.updatedAt = LocalDateTime.now();
     }
