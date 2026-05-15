@@ -1,18 +1,14 @@
 package com.example.devlog.task;
 
 import com.example.devlog.project.Project;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Getter
 @Table(name = "tasks")
 public class Task {
 
@@ -30,8 +26,9 @@ public class Task {
     @Column(nullable = false, length = 1000)
     private String content;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30, columnDefinition = "VARCHAR(30) DEFAULT 'TODO'")
-    private String status;
+    private TaskStatus status;
 
     private LocalDateTime startedAt;
 
@@ -39,21 +36,21 @@ public class Task {
 
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
     private boolean deleted;
+    private LocalDateTime deletedAt;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
 
-    protected Task() {
-    }
+    protected Task() {}
 
     private Task(Project project, String title, String content) {
         this.id = UUID.randomUUID().toString();
         this.project = project;
         this.title = title;
         this.content = content;
-        this.status = "TODO";
+        this.status = TaskStatus.TODO;
         this.startedAt = null;
         this.completedAt = null;
         this.deleted = false;
