@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
@@ -24,4 +26,21 @@ public class TaskController {
         return ApiResponse.success(response);
     }
 
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<List<TaskResponse>> getTasks(
+            @RequestParam(required = true) String projectId
+    ) {
+        List<TaskResponse> response = taskService.getTasks(projectId);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<TaskResponse> getTask(
+            @PathVariable String id
+    ) {
+        TaskResponse response = taskService.getTask(id);
+        return ApiResponse.success(response);
+    }
 }
