@@ -17,7 +17,8 @@ public enum ErrorCode {
     INVALID_PROJECT_STATUS(
             HttpStatus.BAD_REQUEST,
             "올바르지 않은 프로젝트 상태입니다. 사용 가능한 값: " + ProjectStatus.getAvailableValues()
-    );
+    ),
+    TASK_NOT_FOUND(HttpStatus.NOT_FOUND, "태스크를 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
