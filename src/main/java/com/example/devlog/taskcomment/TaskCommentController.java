@@ -6,11 +6,9 @@ import com.example.devlog.taskcomment.dto.TaskCommentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/task-comments")
@@ -26,5 +24,14 @@ public class TaskCommentController {
     ) {
         TaskCommentResponse response = taskCommentService.createTaskComment(request);
         return ApiResponse.created(response);
+    }
+
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<List<TaskCommentResponse>> getTaskComments(
+        @RequestParam String taskId
+    ) {
+        List<TaskCommentResponse> responses = taskCommentService.getTaskComments(taskId);
+        return ApiResponse.success(responses);
     }
 }

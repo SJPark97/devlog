@@ -2,6 +2,8 @@ package com.example.devlog.taskcomment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface TaskCommentRepository extends JpaRepository<TaskComment, String> {
+import java.util.List;
 
+public interface TaskCommentRepository extends JpaRepository<TaskComment, String> {
+    List<TaskComment> findByTaskIdAndDeletedFalseOrderByCreatedAtDesc(String taskId);
 }

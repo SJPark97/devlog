@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class TaskCommentService {
@@ -25,4 +27,14 @@ public class TaskCommentService {
         TaskComment savedTaskComment = taskCommentRepository.save(taskComment);
         return TaskCommentResponse.from(savedTaskComment);
     }
+
+    @Transactional(readOnly = true)
+    public List<TaskCommentResponse> getTaskComments(String taskId) {
+        Task task = taskFinder.getTaskById(taskId);
+        return taskCommentRepository.findByTaskIdAndDeletedFalseOrderByCreatedAtDesc(task.getId())
+                .stream()
+                .map(TaskCommentResponse::from)
+                .toList();
+    }
+
 }
