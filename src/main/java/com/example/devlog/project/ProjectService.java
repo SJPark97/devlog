@@ -23,8 +23,8 @@ public class ProjectService {
     @Transactional
     public ProjectResponse createProject(ProjectCreateRequest request) {
         Project project = Project.create(
-                request.getName(),
-                request.getDescription()
+                request.name(),
+                request.description()
         );
 
         Project savedProject = projectRepository.save(project);
@@ -76,7 +76,7 @@ public class ProjectService {
     @Transactional
     public ProjectResponse updateProject(String id, ProjectUpdateRequest request) {
         Project project = projectFinder.getProjectById(id);
-        project.update(request.getName(), request.getDescription());
+        project.update(request.name(), request.description());
         return ProjectResponse.from(project);
     }
 
@@ -89,7 +89,7 @@ public class ProjectService {
     @Transactional
     public ProjectResponse updateProjectStatus(String id, ProjectStatusUpdateRequest request) {
         Project project = projectFinder.getProjectById(id);
-        project.updateStatus(request.getStatus());
+        project.updateStatus(request.status());
         return ProjectResponse.from(project);
     }
 }
