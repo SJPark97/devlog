@@ -57,4 +57,10 @@ public class TaskService {
         return TaskResponse.from(task);
     }
 
+    @Transactional
+    public void deleteTask(String id) {
+        Task task = taskFinder.getTaskById(id);
+        task.delete();
+    }
+
 }

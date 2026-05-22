@@ -77,4 +77,10 @@ public class Task {
             this.completedAt = LocalDateTime.now();
         }
     }
+
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.deleted = true;
+    }
 }

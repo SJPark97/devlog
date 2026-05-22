@@ -65,4 +65,11 @@ public class TaskController {
         TaskResponse response = taskService.updateTaskStatus(id, requestBody);
         return ApiResponse.success(response);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> deleteTask(@PathVariable String id) {
+        taskService.deleteTask(id);
+        return ApiResponse.success(null, "태스크가 삭제되었습니다.");
+    }
 }
