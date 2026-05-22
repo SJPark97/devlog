@@ -8,11 +8,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Getter
 @Table(name = "task_comments")
 public class TaskComment {
 
@@ -27,8 +29,9 @@ public class TaskComment {
     @Column(nullable = false, length = 1000)
     private String content;
 
-    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
-    private boolean deleted;
+    @Column(nullable = false)
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -42,8 +45,8 @@ public class TaskComment {
         this.id = UUID.randomUUID().toString();
         this.task = task;
         this.content = content;
-        this.deleted = false;
         this.createdAt = LocalDateTime.now();
+        this.deleted = false;
         this.updatedAt = null;
     }
 
