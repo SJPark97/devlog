@@ -3,6 +3,8 @@ package com.example.devlog.task;
 import com.example.devlog.common.dto.ApiResponse;
 import com.example.devlog.task.dto.TaskCreateRequest;
 import com.example.devlog.task.dto.TaskResponse;
+import com.example.devlog.task.dto.TaskStatusUpdateRequest;
+import com.example.devlog.task.dto.TaskUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -41,6 +43,26 @@ public class TaskController {
             @PathVariable String id
     ) {
         TaskResponse response = taskService.getTask(id);
+        return ApiResponse.success(response);
+    }
+
+    @PatchMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<TaskResponse> updateTask(
+            @PathVariable String id,
+            @Valid @RequestBody TaskUpdateRequest requestBody
+    ) {
+        TaskResponse response = taskService.updateTask(id, requestBody);
+        return ApiResponse.success(response);
+    }
+
+    @PatchMapping("/{id}/status")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<TaskResponse> updateTaskStatus(
+            @PathVariable String id,
+            @Valid @RequestBody TaskStatusUpdateRequest requestBody
+    ) {
+        TaskResponse response = taskService.updateTaskStatus(id, requestBody);
         return ApiResponse.success(response);
     }
 }

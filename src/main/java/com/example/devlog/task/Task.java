@@ -61,4 +61,20 @@ public class Task {
     public static Task create(Project project, String title, String content) {
         return new Task(project, title, content);
     }
+
+    public void update(String title, String content) {
+        this.title = title;
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateStatus(TaskStatus status) {
+        this.status = status;
+        this.updatedAt = LocalDateTime.now();
+        if (status == TaskStatus.IN_PROGRESS) {
+            this.startedAt = LocalDateTime.now();
+        } else if (status == TaskStatus.DONE) {
+            this.completedAt = LocalDateTime.now();
+        }
+    }
 }

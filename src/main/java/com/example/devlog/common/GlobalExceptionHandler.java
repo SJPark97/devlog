@@ -30,8 +30,12 @@ public class GlobalExceptionHandler {
         String message = exception.getMostSpecificCause().getMessage();
         ErrorCode errorCode = ErrorCode.INVALID_REQUEST_BODY;
 
-        if (message != null && message.contains("ProjectStatus")) {
-            errorCode = ErrorCode.INVALID_PROJECT_STATUS;
+        if (message != null) {
+            if (message.contains("ProjectStatus")) {
+                errorCode = ErrorCode.INVALID_PROJECT_STATUS;
+            } else if (message.contains("TaskStatus")) {
+                errorCode = ErrorCode.INVALID_TASK_STATUS;
+            }
         }
         HttpStatus status = errorCode.getStatus();
 
