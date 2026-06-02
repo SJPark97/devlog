@@ -3,6 +3,7 @@ package com.example.devlog.taskcomment;
 import com.example.devlog.common.dto.ApiResponse;
 import com.example.devlog.taskcomment.dto.TaskCommentCreateRequest;
 import com.example.devlog.taskcomment.dto.TaskCommentResponse;
+import com.example.devlog.taskcomment.dto.TaskCommentUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,5 +34,15 @@ public class TaskCommentController {
     ) {
         List<TaskCommentResponse> responses = taskCommentService.getTaskComments(taskId);
         return ApiResponse.success(responses);
+    }
+
+    @PatchMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<TaskCommentResponse> updateTaskComment(
+            @PathVariable String id,
+            @Valid @RequestBody TaskCommentUpdateRequest request
+    ) {
+        TaskCommentResponse response = taskCommentService.updateTaskComment(id, request);
+        return ApiResponse.success(response);
     }
 }

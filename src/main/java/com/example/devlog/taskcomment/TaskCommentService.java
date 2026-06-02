@@ -4,6 +4,7 @@ import com.example.devlog.task.Task;
 import com.example.devlog.task.TaskFinder;
 import com.example.devlog.taskcomment.dto.TaskCommentCreateRequest;
 import com.example.devlog.taskcomment.dto.TaskCommentResponse;
+import com.example.devlog.taskcomment.dto.TaskCommentUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.List;
 public class TaskCommentService {
 
     private final TaskFinder taskFinder;
+    private final TaskCommentFinder taskCommentFinder;
     private final TaskCommentRepository taskCommentRepository;
 
     @Transactional
@@ -35,6 +37,16 @@ public class TaskCommentService {
                 .stream()
                 .map(TaskCommentResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public TaskCommentResponse updateTaskComment(
+            String id,
+            @Valid TaskCommentUpdateRequest request
+    ) {
+        TaskComment taskComment = taskCommentFinder.getTaskCommentById(id);
+        taskComment.update(request.content());
+        return TaskCommentResponse.from(taskComment);
     }
 
 }

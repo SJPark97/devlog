@@ -23,8 +23,8 @@ public enum ErrorCode {
     INVALID_TASK_STATUS(
             HttpStatus.BAD_REQUEST,
             "올바르지 않은 태스크 상태입니다. 사용 가능한 값: " + TaskStatus.getAvailableValues()
-    );
-
+    ),
+    TASK_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

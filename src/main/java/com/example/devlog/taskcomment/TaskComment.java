@@ -53,4 +53,9 @@ public class TaskComment {
     public static TaskComment create(Task task, String content) {
         return new TaskComment(task, content);
     }
+
+    public void update(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
