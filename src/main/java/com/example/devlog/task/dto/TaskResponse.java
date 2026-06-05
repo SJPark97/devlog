@@ -1,6 +1,5 @@
 package com.example.devlog.task.dto;
 
-import com.example.devlog.project.Project;
 import com.example.devlog.task.Task;
 import com.example.devlog.task.TaskStatus;
 
