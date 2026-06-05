@@ -45,4 +45,13 @@ public class TaskCommentController {
         TaskCommentResponse response = taskCommentService.updateTaskComment(id, request);
         return ApiResponse.success(response);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> deleteTaskComment(
+            @PathVariable String id
+    ) {
+        taskCommentService.deleteTaskComment(id);
+        return ApiResponse.success(null, "댓글이 삭제되었습니다.");
+    }
 }

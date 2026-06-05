@@ -58,4 +58,10 @@ public class TaskComment {
         this.content = content;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
 }

@@ -49,4 +49,11 @@ public class TaskCommentService {
         return TaskCommentResponse.from(taskComment);
     }
 
+    @Transactional
+    public void deleteTaskComment(
+            String id
+    ) {
+        TaskComment taskComment = taskCommentFinder.getTaskCommentById(id);
+        taskComment.delete();
+    }
 }
