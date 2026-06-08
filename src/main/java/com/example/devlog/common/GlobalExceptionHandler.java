@@ -3,6 +3,8 @@ package com.example.devlog.common;
 import com.example.devlog.common.dto.ApiResponse;
 import com.example.devlog.common.exception.BusinessException;
 import com.example.devlog.common.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -55,5 +58,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .body(ApiResponse.fail(status, message));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(
+            DataIntegrityViolationException exception
+    ) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        return ResponseEntity
+                .status(status)
+                .body(ApiResponse.fail(status, "데이터 제약 조건을 위반했습니다."));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception exception) {
+        log.error("Unexpected server error", exception);
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+
+        return ResponseEntity
+                .status(status)
+                .body(ApiResponse.fail(status, "서버 내부 오류가 발생했습니다."));
     }
 }
