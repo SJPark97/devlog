@@ -12,4 +12,5 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
     Page<Project> findByDeletedFalse(Pageable pageable);
     Page<Project> findByDeletedFalseAndNameContainingIgnoreCase(String keyword, Pageable pageable);
     Optional<Project> findByIdAndDeletedFalse(String id);
+    long countByDeletedFalseAndStatus(ProjectStatus status);
 }
