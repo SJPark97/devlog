@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -68,6 +69,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .body(ApiResponse.fail(status, "데이터 제약 조건을 위반했습니다."));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(
+            NoResourceFoundException exception
+    ) {
+        HttpStatus status = HttpStatus.NOT_FOUND;
+
+        return ResponseEntity
+                .status(status)
+                .body(ApiResponse.fail(status, "요청한 리소스를 찾을 수 없습니다."));
     }
 
     @ExceptionHandler(Exception.class)
