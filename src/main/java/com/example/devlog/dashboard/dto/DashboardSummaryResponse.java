@@ -7,7 +7,6 @@ import java.util.Map;
 public record DashboardSummaryResponse(
         long activeProjectCount,
         long totalTaskCount,
-        Map<TaskStatus, Long> taskStatusCounts,
-        long recentCommentCount
+        Map<TaskStatus, Long> taskStatusCounts
 ) {
 }
