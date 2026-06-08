@@ -29,7 +29,6 @@ public class TaskComment {
     @Column(nullable = false, length = 1000)
     private String content;
 
-    @Column(nullable = false)
     private Boolean deleted;
     private LocalDateTime deletedAt;
 
