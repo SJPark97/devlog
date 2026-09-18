@@ -42,12 +42,12 @@ public class EventService {
         return emitter;
     }
 
-    public void publishProject(String projectId, String eventName, Object data) {
+    public void publishProject(String projectId, ProjectEventType type, Object data) {
         List<SseEmitter> emitters = projectEmitters.getOrDefault(projectId, List.of());
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event()
-                        .name(eventName)
+                        .name(type.name())
                         .data(data));
             } catch (IOException exception) {
                 emitter.completeWithError(exception);
@@ -58,6 +58,6 @@ public class EventService {
 
     @TransactionalEventListener
     public void handleProjectEvent(ProjectEvent event) {
-        publishProject(event.projectId(), event.eventName(), event.data());
+        publishProject(event.projectId(), event.type(), event.data());
     }
 }

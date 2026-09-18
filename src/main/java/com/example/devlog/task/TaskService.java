@@ -1,5 +1,7 @@
 package com.example.devlog.task;
 
+import com.example.devlog.common.event.ProjectEvent;
+import com.example.devlog.common.event.ProjectEventType;
 import com.example.devlog.project.Project;
 import com.example.devlog.project.ProjectFinder;
 import com.example.devlog.task.dto.TaskCreateRequest;
@@ -7,6 +9,7 @@ import com.example.devlog.task.dto.TaskResponse;
 import com.example.devlog.task.dto.TaskStatusUpdateRequest;
 import com.example.devlog.task.dto.TaskUpdateRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,13 +22,16 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final ProjectFinder projectFinder;
     private final TaskFinder taskFinder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TaskResponse createTask(TaskCreateRequest request) {
         Project project = projectFinder.getProjectById(request.projectId());
         Task task = Task.create(project, request.title(), request.content());
         Task savedTask = taskRepository.save(task);
-        return TaskResponse.from(savedTask);
+        TaskResponse response = TaskResponse.from(savedTask);
+        eventPublisher.publishEvent(new ProjectEvent(project.getId(), ProjectEventType.TASK_CREATED, response));
+        return response;
     }
 
     @Transactional(readOnly = true)
