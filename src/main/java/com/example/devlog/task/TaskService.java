@@ -4,10 +4,7 @@ import com.example.devlog.common.event.ProjectEvent;
 import com.example.devlog.common.event.ProjectEventType;
 import com.example.devlog.project.Project;
 import com.example.devlog.project.ProjectFinder;
-import com.example.devlog.task.dto.TaskCreateRequest;
-import com.example.devlog.task.dto.TaskResponse;
-import com.example.devlog.task.dto.TaskStatusUpdateRequest;
-import com.example.devlog.task.dto.TaskUpdateRequest;
+import com.example.devlog.task.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -63,13 +60,17 @@ public class TaskService {
     public TaskResponse updateTaskStatus(String id, TaskStatusUpdateRequest request) {
         Task task = taskFinder.getTaskById(id);
         task.updateStatus(request.status());
-        return TaskResponse.from(task);
+        TaskResponse response = TaskResponse.from(task);
+
+        eventPublisher.publishEvent(new ProjectEvent(response.projectId(), ProjectEventType.TASK_UPDATED, response));
+        return response;
     }
 
     @Transactional
     public void deleteTask(String id) {
         Task task = taskFinder.getTaskById(id);
         task.delete();
+        Object data = new TaskDeletedResponse(task.getId());
+        eventPublisher.publishEvent(new ProjectEvent(task.getProject().getId(), ProjectEventType.TASK_DELETED, data));
     }
-
 }
