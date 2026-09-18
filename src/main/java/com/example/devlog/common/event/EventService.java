@@ -40,4 +40,18 @@ public class EventService {
 
         return emitter;
     }
+
+    public void publishProject(String projectId, String eventName, Object data) {
+        List<SseEmitter> emitters = projectEmitters.getOrDefault(projectId, List.of());
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name(eventName)
+                        .data(data));
+            } catch (IOException exception) {
+                emitter.completeWithError(exception);
+                removeProjectEmitter(projectId, emitter);
+            }
+        }
+    }
 }
