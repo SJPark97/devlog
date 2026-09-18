@@ -53,7 +53,10 @@ public class TaskService {
     public TaskResponse updateTask(String id, TaskUpdateRequest request) {
         Task task = taskFinder.getTaskById(id);
         task.update(request.title(), request.content());
-        return TaskResponse.from(task);
+        TaskResponse response = TaskResponse.from(task);
+
+        eventPublisher.publishEvent(new ProjectEvent(response.projectId(), ProjectEventType.TASK_UPDATED, response));
+        return response;
     }
 
     @Transactional
