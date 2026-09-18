@@ -2,6 +2,7 @@ package com.example.devlog.common.event;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -53,5 +54,10 @@ public class EventService {
                 removeProjectEmitter(projectId, emitter);
             }
         }
+    }
+
+    @TransactionalEventListener
+    public void handleProjectEvent(ProjectEvent event) {
+        publishProject(event.projectId(), event.eventName(), event.data());
     }
 }
