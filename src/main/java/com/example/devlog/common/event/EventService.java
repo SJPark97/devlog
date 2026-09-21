@@ -41,6 +41,21 @@ public class EventService {
         }
     }
 
+     private void replayOrResync(String projectId, SseEmitter emitter, Long lastId) {
+        Long oldestId = projectEventStore.oldestId(projectId);
+        if (oldestId == null || oldestId > lastId + 1) {
+            send(projectId, emitter, SseEmitter.event().name("resync").data("resync required"));
+            return;
+        }
+        List<StoredEvent> storedEvents = projectEventStore.findAfter(projectId, lastId);
+        for (StoredEvent storeEvent:storedEvents) {
+            send(projectId, emitter, SseEmitter.event()
+                    .id(String.valueOf(storeEvent.id()))
+                    .name(storeEvent.type().name())
+                    .data(storeEvent.data()));
+        }
+    }
+
     public SseEmitter subscribeProject(String projectId, @Nullable String lastEventId) {
         SseEmitter emitter = createSseEmitter();
         projectEmitters.computeIfAbsent(projectId, key -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -53,13 +68,7 @@ public class EventService {
         send(projectId, emitter, builder);
         Long lastId = NumberUtils.parseLongOrNull(lastEventId);
         if (lastId != null) {
-            List<StoredEvent> storedEvents = projectEventStore.findAfter(projectId, lastId);
-            for (StoredEvent storeEvent:storedEvents) {
-                send(projectId, emitter, SseEmitter.event()
-                        .id(String.valueOf(storeEvent.id()))
-                        .name(storeEvent.type().name())
-                        .data(storeEvent.data()));
-            }
+            replayOrResync(projectId, emitter, lastId);
         }
 
         return emitter;
