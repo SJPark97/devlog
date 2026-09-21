@@ -3,6 +3,7 @@ package com.example.devlog.common.event;
 import org.springframework.stereotype.Component;
 
 import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -17,11 +18,18 @@ public class ProjectEventStore {
     StoredEvent save(String projectId, ProjectEventType type, Object data) {
         long id = ids.computeIfAbsent(projectId, key -> new AtomicLong()).incrementAndGet();
         StoredEvent storedEvent = new StoredEvent(id, type, data);
-        Deque<StoredEvent> event = events.computeIfAbsent(projectId, key -> new ConcurrentLinkedDeque<>());
-        event.add(storedEvent);
-        while (event.size() > MAX_BUFFER_SIZE) {
-            event.pollFirst();
+        Deque<StoredEvent> buffer = events.computeIfAbsent(projectId, key -> new ConcurrentLinkedDeque<>());
+        buffer.add(storedEvent);
+        while (buffer.size() > MAX_BUFFER_SIZE) {
+            buffer.pollFirst();
         }
         return storedEvent;
+    }
+
+    List<StoredEvent> findAfter(String projectId, long lastId) {
+        Deque<StoredEvent> buffer = events.getOrDefault(projectId, new ConcurrentLinkedDeque<>());
+        return buffer.stream()
+                .filter(e -> e.id() > lastId)
+                .toList();
     }
 }
