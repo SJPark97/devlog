@@ -29,8 +29,17 @@ class EventServiceTest {
      * EventService 가 emitter 를 내부에서 직접 생성하면 테스트가 가로챌 수 없으므로,
      * 생성 부분만 createSseEmitter() 로 분리해두고 여기서 바꿔치기한다.
      * Map 관리·발행 로직은 부모 것을 그대로 쓰므로 실제 동작과 같다.
+     *
+     * ProjectEventStore 는 가짜를 쓰지 않고 진짜를 넘긴다.
+     * 메모리 Map 뿐이라 DB 가 필요 없고, 테스트마다 새로 만들어져 서로 영향이 없다.
+     * 단 여기서 만들어 버리므로 테스트가 store 를 직접 들여다볼 수는 없다.
+     * 재생 테스트처럼 버퍼를 미리 채워야 하면 생성자로 받도록 바꿔야 한다.
      */
     static class TestEventService extends EventService {
+        public TestEventService() {
+            super(new ProjectEventStore());
+        }
+
         @Override
         protected SseEmitter createSseEmitter() {
             return new RecordingEmitter();
@@ -45,7 +54,7 @@ class EventServiceTest {
     @Test
     void subscribeProject_returnsEmitter() {
         TestEventService eventService = new TestEventService();
-        SseEmitter emitter = eventService.subscribeProject("project-1");
+        SseEmitter emitter = eventService.subscribeProject("project-1", null);
         Assertions.assertThat(emitter).isNotNull();
     }
 
@@ -59,8 +68,8 @@ class EventServiceTest {
     void publishProject_sendsEventToAllSubscribersOfProject() {
         TestEventService eventService = new TestEventService();
         String projectId = "project-1";
-        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject(projectId);
-        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject(projectId);
+        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
+        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
         eventService.publishProject(projectId, ProjectEventType.TASK_CREATED, "테스트 데이터");
         Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
         Assertions.assertThat(emitter2.sendCount).isEqualTo(2);
@@ -75,8 +84,8 @@ class EventServiceTest {
     @Test
     void publishProject_doesNotSendEventToOtherProjectSubscribers() {
         TestEventService eventService = new TestEventService();
-        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject("project-1");
-        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject("project-2");
+        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject("project-1", null);
+        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject("project-2", null);
         eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
         Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
         Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
@@ -96,7 +105,7 @@ class EventServiceTest {
     @Test
     void publishProject_removesEmitterWhenSendFails() {
         TestEventService eventService = new TestEventService();
-        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project-1");
+        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project-1", null);
         emitter.failOnSend = true;
         eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
         eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
@@ -104,19 +113,23 @@ class EventServiceTest {
     }
 
     /*
-     * 다음 단계: 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는지 확인한다.
+     * 다음 단계: 재연결 시 빠진 이벤트를 재생하는지 확인한다. (SSE 4단계)
      *
-     * publishProject_doesNothingWhenNoSubscriber
+     * subscribeProject_replaysEventsAfterLastEventId
      *
-     * given  - 아무도 구독하지 않은 상태
-     * when   - 존재하지 않는 프로젝트 ID 로 발행
-     * then   - 예외 없이 그냥 지나간다 (getOrDefault(..., List.of()) 가 하는 일)
+     * given  - store 에 이벤트 3개를 미리 저장 (id 1, 2, 3)
+     * when   - Last-Event-ID = "1" 로 구독
+     * then   - connect + 2번 + 3번 = 3번 전송된다
      *
-     * 힌트: 값 비교가 아니라 "터지지 않는다"를 단언한다.
-     *       AssertJ 의 assertThatCode(() -> ...).doesNotThrowAnyException()
+     * 준비물: 버퍼를 미리 채우려면 테스트가 store 를 쥐고 있어야 한다.
+     *        TestEventService 가 ProjectEventStore 를 생성자로 받도록 바꿀 것.
      *
      * 이후 후보
-     * - handleProjectEvent 가 ProjectEvent 를 publishProject 로 그대로 넘기는지
-     * - TaskService 가 태스크 생성·수정·삭제 시 ProjectEvent 를 발행하는지 (Mockito 필요)
+     * - Last-Event-ID 가 null 이면 재생하지 않는다 (첫 연결)
+     * - 숫자가 아닌 Last-Event-ID 가 와도 예외 없이 첫 연결처럼 처리한다
+     * - 버퍼에서 밀려나 구멍이 생긴 경우 resync 를 보낸다
+     * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
+     *   (assertThatCode(() -> ...).doesNotThrowAnyException())
+     * - TaskService 가 태스크 변경 시 ProjectEvent 를 발행하는지 (Mockito 필요)
      */
 }

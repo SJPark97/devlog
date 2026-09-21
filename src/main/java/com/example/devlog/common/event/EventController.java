@@ -5,11 +5,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import org.springframework.web.bind.annotation.GetMapping;
 
 @Tag(name = "Event", description = "실시간 알림(SSE) API")
 @RestController
@@ -25,9 +22,11 @@ public class EventController {
     )
     @GetMapping(value = "/projects/{projectId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe(
+            @Parameter(description = "마지막으로 받은 이벤트 ID")
+            @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
             @Parameter(description = "프로젝트 ID", example = "f47ac10b-58cc-4372-a567-0e02b2c3d479")
             @PathVariable String projectId
     ) {
-        return eventService.subscribeProject(projectId);
+        return eventService.subscribeProject(projectId, lastEventId);
     }
 }

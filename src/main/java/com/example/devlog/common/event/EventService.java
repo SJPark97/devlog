@@ -1,5 +1,6 @@
 package com.example.devlog.common.event;
 
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -16,6 +17,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class EventService {
 
     private final Map<String, List<SseEmitter>> projectEmitters = new ConcurrentHashMap<>();
+    private final ProjectEventStore projectEventStore;
+
     protected SseEmitter createSseEmitter() {
         return new SseEmitter(60L * 1000L);
     }
@@ -28,7 +31,7 @@ public class EventService {
         });
     }
 
-    public SseEmitter subscribeProject(String projectId) {
+    public SseEmitter subscribeProject(String projectId, @Nullable String lastEventId) {
         SseEmitter emitter = createSseEmitter();
         projectEmitters.computeIfAbsent(projectId, key -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> removeProjectEmitter(projectId, emitter));
@@ -47,9 +50,11 @@ public class EventService {
 
     public void publishProject(String projectId, ProjectEventType type, Object data) {
         List<SseEmitter> emitters = projectEmitters.getOrDefault(projectId, List.of());
+        StoredEvent stored = projectEventStore.save(projectId, type, data);
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event()
+                        .id(String.valueOf(stored.id()))
                         .name(type.name())
                         .data(data));
             } catch (IOException exception) {
