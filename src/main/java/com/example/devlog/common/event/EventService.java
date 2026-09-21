@@ -16,6 +16,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class EventService {
 
     private final Map<String, List<SseEmitter>> projectEmitters = new ConcurrentHashMap<>();
+    protected SseEmitter createSseEmitter() {
+        return new SseEmitter(60L * 1000L);
+    }
 
     private void removeProjectEmitter(String projectId, SseEmitter emitter) {
         projectEmitters.computeIfPresent(projectId, (key, list) -> {
@@ -26,7 +29,7 @@ public class EventService {
     }
 
     public SseEmitter subscribeProject(String projectId) {
-        SseEmitter emitter = new SseEmitter(60L * 1000L);
+        SseEmitter emitter = createSseEmitter();
         projectEmitters.computeIfAbsent(projectId, key -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> removeProjectEmitter(projectId, emitter));
         emitter.onTimeout(() -> removeProjectEmitter(projectId, emitter));
