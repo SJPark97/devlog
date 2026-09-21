@@ -62,18 +62,37 @@ class EventServiceTest {
         Assertions.assertThat(emitter2.sendCount).isEqualTo(2);
     }
 
+    /**
+     * 프로젝트별 격리 검증. 이 기능의 핵심이라 반드시 지켜져야 한다.
+     *
+     * project-2 구독자의 sendCount 가 0이 아니라 1인 이유: 구독 시 connect 는 받기 때문.
+     * 여기서 2가 나오면 다른 프로젝트 이벤트까지 받고 있다는 뜻이다.
+     */
+    @Test
+    void publishProject_doesNotSendEventToOtherProjectSubscribers() {
+        TestEventService eventService = new TestEventService();
+        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject("project-1");
+        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject("project-2");
+        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+        Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
+        Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
+    }
+
     /*
-     * 다음 단계: 다른 프로젝트 구독자에게는 이벤트가 가지 않는지 확인한다.
+     * 다음 단계: 연결이 끊긴 emitter 는 구독 목록에서 제거되는지 확인한다.
      *
-     * publishProject_doesNotSendEventToOtherProjectSubscribers
+     * publishProject_removesEmitterWhenSendFails
      *
-     * given  - project-1 구독자 1명, project-2 구독자 1명
-     * when   - project-1 에만 발행
-     * then   - project-1 구독자는 2번(connect + 이벤트), project-2 구독자는 1번(connect 만)
+     * given  - send 호출 시 IOException 을 던지는 emitter 로 구독
+     * when   - 같은 프로젝트에 두 번 발행
+     * then   - 첫 발행에서 제거되므로 두 번째 발행은 그 emitter 에 도달하지 않는다
+     *          (실패한 emitter 의 send 호출 횟수가 더 늘지 않아야 한다)
+     *
+     * 준비물: RecordingEmitter 처럼 send() 를 재정의하되 IOException 을 던지는 emitter 가 필요하다.
+     *        EventService.publishProject 의 catch 블록(removeProjectEmitter)이 검증 대상.
      *
      * 이후 후보
      * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
-     * - send 가 실패한(연결이 끊긴) emitter 는 목록에서 제거된다
-     * - 구독이 모두 해제되면 빈 프로젝트 key 도 Map 에서 사라진다
+     * - 구독이 모두 해제되면 빈 프로젝트 key 도 Map 에서 사라진다 (computeIfPresent 의 null 반환)
      */
 }
