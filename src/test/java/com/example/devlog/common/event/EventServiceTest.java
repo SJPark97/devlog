@@ -5,6 +5,8 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
+
 class EventServiceTest {
 
     /**
@@ -14,9 +16,11 @@ class EventServiceTest {
      */
     static class RecordingEmitter extends SseEmitter {
         int sendCount = 0;
+        boolean failOnSend = false;
         @Override
-        public void send(@NonNull SseEventBuilder builder) {
+        public void send(@NonNull SseEventBuilder builder) throws IOException {
             sendCount++;
+            if (failOnSend) throw new IOException("연결 끊김");
         }
     }
 
@@ -78,21 +82,41 @@ class EventServiceTest {
         Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
     }
 
+    /**
+     * 연결이 끊긴 emitter 가 구독 목록에서 제거되는지 확인한다.
+     * publishProject 의 catch 블록이 검증 대상 — 평소에는 실행되지 않는 경로라 버그가 숨기 쉽다.
+     *
+     * 흐름: 구독 1(connect 성공) → failOnSend on → 1차 발행 2(호출됨, 예외 → 제거)
+     *       → 2차 발행 2(제거돼서 호출조차 안 됨)
+     *
+     * 마지막 2가 핵심. 제거가 안 되면 3이 되어 실패한다.
+     * RecordingEmitter 가 던지기 전에 sendCount 를 먼저 올리는 이유도 이것.
+     * 순서가 반대면 "제거돼서 2"인지 "세기 전에 예외라서 2"인지 구분할 수 없어 테스트가 무의미해진다.
+     */
+    @Test
+    void publishProject_removesEmitterWhenSendFails() {
+        TestEventService eventService = new TestEventService();
+        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project-1");
+        emitter.failOnSend = true;
+        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+        Assertions.assertThat(emitter.sendCount).isEqualTo(2);
+    }
+
     /*
-     * 다음 단계: 연결이 끊긴 emitter 는 구독 목록에서 제거되는지 확인한다.
+     * 다음 단계: 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는지 확인한다.
      *
-     * publishProject_removesEmitterWhenSendFails
+     * publishProject_doesNothingWhenNoSubscriber
      *
-     * given  - send 호출 시 IOException 을 던지는 emitter 로 구독
-     * when   - 같은 프로젝트에 두 번 발행
-     * then   - 첫 발행에서 제거되므로 두 번째 발행은 그 emitter 에 도달하지 않는다
-     *          (실패한 emitter 의 send 호출 횟수가 더 늘지 않아야 한다)
+     * given  - 아무도 구독하지 않은 상태
+     * when   - 존재하지 않는 프로젝트 ID 로 발행
+     * then   - 예외 없이 그냥 지나간다 (getOrDefault(..., List.of()) 가 하는 일)
      *
-     * 준비물: RecordingEmitter 처럼 send() 를 재정의하되 IOException 을 던지는 emitter 가 필요하다.
-     *        EventService.publishProject 의 catch 블록(removeProjectEmitter)이 검증 대상.
+     * 힌트: 값 비교가 아니라 "터지지 않는다"를 단언한다.
+     *       AssertJ 의 assertThatCode(() -> ...).doesNotThrowAnyException()
      *
      * 이후 후보
-     * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
-     * - 구독이 모두 해제되면 빈 프로젝트 key 도 Map 에서 사라진다 (computeIfPresent 의 null 반환)
+     * - handleProjectEvent 가 ProjectEvent 를 publishProject 로 그대로 넘기는지
+     * - TaskService 가 태스크 생성·수정·삭제 시 ProjectEvent 를 발행하는지 (Mockito 필요)
      */
 }
