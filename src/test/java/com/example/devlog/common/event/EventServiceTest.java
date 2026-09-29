@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.Map;
 
 class EventServiceTest {
 
@@ -33,7 +34,7 @@ class EventServiceTest {
      * ProjectEventStore 는 가짜를 쓰지 않고 진짜를 넘긴다.
      * 메모리 Map 뿐이라 DB 가 필요 없고, 테스트마다 새로 만들어져 서로 영향이 없다.
      * 단 여기서 만들어 버리므로 테스트가 store 를 직접 들여다볼 수는 없다.
-     * 재생 테스트처럼 버퍼를 미리 채워야 하면 생성자로 받도록 바꿔야 한다.
+     * 버퍼를 미리 채워야 하는 재생 테스트는 store 대신 publishProject 로 채운다.
      */
     static class TestEventService extends EventService {
         public TestEventService() {
@@ -112,22 +113,51 @@ class EventServiceTest {
         Assertions.assertThat(emitter.sendCount).isEqualTo(2);
     }
 
+    /**
+     * 재연결 시 놓친 이벤트만 골라 다시 보내는지 확인한다. (SSE 4단계)
+     * 클라이언트가 Last-Event-ID 로 "5번까지 받았다"고 알려주면 6~50번만 재생해야 한다.
+     *
+     * sendCount 가 46인 이유: connect 1번 + 6~50번 45개.
+     * 흐름마다 숫자가 달라서 실패했을 때 어디가 틀렸는지 바로 보인다.
+     *   1 = 재생 안 됨 / 2 = resync 로 빠짐 / 46 = 정상 재생
+     *   47 = 5번부터 보냄(경계 실수) / 51 = 1번부터 전부 보냄
+     * 재생할 이벤트가 1개뿐이면 정상 재생(connect + 1개)과 resync(connect + resync)가 둘 다 2라서
+     * 발행이 저장을 빠뜨려 resync 로 빠져도 테스트가 통과해버린다. 그래서 재생 개수를 여러 개로 둔다.
+     *
+     * 버퍼는 store 를 직접 채우지 않고 publishProject 로 채운다.
+     * 이벤트가 실제로 쌓이는 경로 그대로라, 발행 쪽 버그도 이 테스트에서 같이 잡힌다.
+     * (구독자가 없어도 publishProject 는 store 에 저장한다)
+     */
+    @Test
+    void subscribeProject_replaysEventsAfterLastEventId() {
+        TestEventService eventService = new TestEventService();
+        int n = 50;
+        for (int i = 1; i <= n; i++) {
+            eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
+        };
+        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
+        Assertions.assertThat(emitter.sendCount).isEqualTo(46);
+    }
+
     /*
-     * 다음 단계: 재연결 시 빠진 이벤트를 재생하는지 확인한다. (SSE 4단계)
+     * 다음 단계: 서버 재시작 후 재연결하면 resync 를 보내는지 확인한다.
      *
-     * subscribeProject_replaysEventsAfterLastEventId
+     * subscribeProject_sendsResyncWhenLastEventIdIsAheadOfLatestEvent
      *
-     * given  - store 에 이벤트 3개를 미리 저장 (id 1, 2, 3)
-     * when   - Last-Event-ID = "1" 로 구독
-     * then   - connect + 2번 + 3번 = 3번 전송된다
+     * given  - 새 서비스(= 재시작 직후)에서 3번 발행 (id 1, 2, 3)
+     * when   - Last-Event-ID = "57" 로 구독 (재시작 전에 57번까지 받은 클라이언트)
+     * then   - connect + resync = 2번 전송된다
      *
-     * 준비물: 버퍼를 미리 채우려면 테스트가 store 를 쥐고 있어야 한다.
-     *        TestEventService 가 ProjectEventStore 를 생성자로 받도록 바꿀 것.
+     * 이 테스트는 지금 코드에서 실패한다(1 이 나온다). 실패를 먼저 확인한 뒤 고친다.
+     * 이벤트 id 가 메모리에 있어서 재시작하면 1부터 다시 매겨지는데,
+     * replayOrResync 는 가장 오래된 id(1) > 57 + 1 이 거짓이라 resync 를 안 보내고
+     * findAfter(57) 은 빈 목록이라 아무것도 보내지 않는다. → 1~3번을 조용히 놓친다.
      *
      * 이후 후보
      * - Last-Event-ID 가 null 이면 재생하지 않는다 (첫 연결)
      * - 숫자가 아닌 Last-Event-ID 가 와도 예외 없이 첫 연결처럼 처리한다
      * - 버퍼에서 밀려나 구멍이 생긴 경우 resync 를 보낸다
+     *   (102번 발행 → 버퍼에 3~102번만 남음 → "1" 로 구독하면 2번이 빈다)
      * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
      *   (assertThatCode(() -> ...).doesNotThrowAnyException())
      * - TaskService 가 태스크 변경 시 ProjectEvent 를 발행하는지 (Mockito 필요)
