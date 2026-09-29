@@ -35,7 +35,7 @@ public class EventService {
     private void send(String projectId, SseEmitter emitter, SseEmitter.SseEventBuilder builder) {
         try {
             emitter.send(builder);
-        } catch (IOException exception) {
+        } catch (IOException | IllegalStateException exception) {
             emitter.completeWithError(exception);
             removeProjectEmitter(projectId, emitter);
         }

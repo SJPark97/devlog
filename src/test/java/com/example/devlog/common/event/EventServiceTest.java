@@ -3,10 +3,12 @@ package com.example.devlog.common.event;
 import org.assertj.core.api.Assertions;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ class EventServiceTest {
         int sendCount = 0;
         boolean failOnSend = false;
         List<String> eventNames = new ArrayList<>();
+        boolean alreadyCompleted = false;
         @Override
         public void send(@NonNull SseEventBuilder builder) throws IOException {
             sendCount++;
@@ -33,6 +36,7 @@ class EventServiceTest {
                 }
             }
             if (failOnSend) throw new IOException("연결 끊김");
+            if (alreadyCompleted) throw new IllegalStateException("이미 끝난 연결");
         }
     }
 
@@ -153,5 +157,30 @@ class EventServiceTest {
         };
         RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
         Assertions.assertThat(emitter.eventNames).containsExactly("connect", "resync");
+    }
+
+    /**
+     * 이미 끝난 연결 하나 때문에 다른 구독자가 이벤트를 못 받으면 안 된다.
+     * 끝난 emitter 는 Mockito mock 으로 만들어 send 할 때 IllegalStateException 을 던지게 한다.
+     * liveEmitter 는 connect + TASK_CREATED 로 2번 받아야 한다.
+     */
+    @Test
+    void publishProject_keepsSendingToOthersWhenEmitterAlreadyCompleted() throws IOException {
+        SseEmitter completedEmitter = Mockito.mock(SseEmitter.class);
+        SseEmitter liveEmitter = Mockito.mock(SseEmitter.class);
+        Iterator<SseEmitter> emitters = List.of(completedEmitter, liveEmitter).iterator();
+        EventService eventService = new EventService(new ProjectEventStore()) {
+            @Override
+            protected SseEmitter createSseEmitter() {
+                return emitters.next();
+            }
+        };
+        eventService.subscribeProject("project-1", null);
+        eventService.subscribeProject("project-1", null);
+        Mockito.doThrow(new IllegalStateException("이미 끝난 연결"))
+                .when(completedEmitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
+        Assertions.assertThatCode(() -> eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터"))
+                .doesNotThrowAnyException();
+        Mockito.verify(liveEmitter, Mockito.times(2)).send(Mockito.any(SseEmitter.SseEventBuilder.class));
     }
 }
