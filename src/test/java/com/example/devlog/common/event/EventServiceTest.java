@@ -138,35 +138,46 @@ class EventServiceTest {
                 .send(Mockito.any(SseEmitter.SseEventBuilder.class));
     }
 
-    /**
-     * 재연결 시 Last-Event-ID(5) 이후 이벤트만 재생하는지 확인한다.
-     * 46 = connect 1 + 6~50번 45개. (2 면 resync 로 빠짐, 51 이면 처음부터 재생)
-     * 버퍼는 publishProject 로 채워 발행 경로까지 같이 검증한다.
-     */
-    @Test
-    void subscribeProject_replaysEventsAfterLastEventId() {
-        TestEventService eventService = new TestEventService();
-        int n = 50;
-        for (int i = 1; i <= n; i++) {
-            eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
-        };
-        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
-        Assertions.assertThat(emitter.sendCount).isEqualTo(46);
-    }
+    @Nested
+    @DisplayName("재연결")
+    class Reconnect {
+        TestEventService eventService;
 
-    /**
-     * 놓친 이벤트(6~100번)가 버퍼에서 밀려났으면 재생 대신 resync 를 보내는지 확인한다.
-     * containsExactly 라서 resync 뒤에 재생이 이어지는 실수(return 누락)도 잡는다.
-     */
-    @Test
-    void subscribeProject_sendsResyncWhenMissedEventsFellOutOfBuffer() {
-        TestEventService eventService = new TestEventService();
-        int n = 200;
-        for (int i = 1; i <= n; i++) {
-            eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
-        };
-        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
-        Assertions.assertThat(emitter.eventNames).containsExactly("connect", "resync");
+        @BeforeEach
+        void setUp() {
+            eventService = new TestEventService();
+        }
+
+        /**
+         * 재연결 시 Last-Event-ID(5) 이후 이벤트만 재생하는지 확인한다.
+         * 46 = connect 1 + 6~50번 45개. (2 면 resync 로 빠짐, 51 이면 처음부터 재생)
+         * 버퍼는 publishProject 로 채워 발행 경로까지 같이 검증한다.
+         */
+        @Test
+        @DisplayName("Last-Event-ID 이후 놓친 이벤트만 재생한다")
+        void subscribeProject_replaysEventsAfterLastEventId() {
+            int n = 50;
+            for (int i = 1; i <= n; i++) {
+                eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
+            };
+            RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
+            Assertions.assertThat(emitter.sendCount).isEqualTo(46);
+        }
+
+        /**
+         * 놓친 이벤트(6~100번)가 버퍼에서 밀려났으면 재생 대신 resync 를 보내는지 확인한다.
+         * containsExactly 라서 resync 뒤에 재생이 이어지는 실수(return 누락)도 잡는다.
+         */
+        @Test
+        @DisplayName("놓친 이벤트가 버퍼에서 밀려났으면 resync 를 보낸다")
+        void subscribeProject_sendsResyncWhenMissedEventsFellOutOfBuffer() {
+            int n = 200;
+            for (int i = 1; i <= n; i++) {
+                eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
+            };
+            RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
+            Assertions.assertThat(emitter.eventNames).containsExactly("connect", "resync");
+        }
     }
 
     /**
