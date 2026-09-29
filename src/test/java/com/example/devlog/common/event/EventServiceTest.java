@@ -14,14 +14,8 @@ class EventServiceTest {
 
     /**
      * 실제 SSE 연결 대신 전송 횟수와 이벤트 이름을 기록하는 테스트용 emitter.
-     * SseEmitter 에는 "무엇을 보냈는지" 꺼내 볼 수 있는 메서드가 없어서,
-     * send() 를 가로채 호출 횟수와 보낸 이벤트 이름을 기록하는 방식으로 검증한다.
-     *
-     * 이벤트 이름은 builder.build() 가 돌려주는 조각들에서 꺼낸다.
-     * 이름만 따로 담긴 조각은 없고 "event:resync\ndata:" 처럼 다른 줄과 붙어 있어서,
-     * 문자열 조각마다 "event:" 로 시작하는 줄을 찾아 뒷부분만 뗀다.
-     * 첫 조각만 보지 않고 전부 도는 이유: 조각을 어디서 자르는지는 Spring 내부 사정이라
-     * (data 없이 이름만 보내면 이름이 마지막 조각에 들어간다) 위치에 기대지 않으려고.
+     * SseEmitter 에는 보낸 내용을 꺼내는 메서드가 없어서 send() 를 가로채 기록한다.
+     * 이름은 build() 조각 안의 "event:" 줄에서 뗀다. (조각 위치는 Spring 내부 사정이라 전부 돈다)
      */
     static class RecordingEmitter extends SseEmitter {
         int sendCount = 0;
@@ -131,19 +125,9 @@ class EventServiceTest {
     }
 
     /**
-     * 재연결 시 놓친 이벤트만 골라 다시 보내는지 확인한다. (SSE 4단계)
-     * 클라이언트가 Last-Event-ID 로 "5번까지 받았다"고 알려주면 6~50번만 재생해야 한다.
-     *
-     * sendCount 가 46인 이유: connect 1번 + 6~50번 45개.
-     * 흐름마다 숫자가 달라서 실패했을 때 어디가 틀렸는지 바로 보인다.
-     *   1 = 재생 안 됨 / 2 = resync 로 빠짐 / 46 = 정상 재생
-     *   47 = 5번부터 보냄(경계 실수) / 51 = 1번부터 전부 보냄
-     * 재생할 이벤트가 1개뿐이면 정상 재생(connect + 1개)과 resync(connect + resync)가 둘 다 2라서
-     * 발행이 저장을 빠뜨려 resync 로 빠져도 테스트가 통과해버린다. 그래서 재생 개수를 여러 개로 둔다.
-     *
-     * 버퍼는 store 를 직접 채우지 않고 publishProject 로 채운다.
-     * 이벤트가 실제로 쌓이는 경로 그대로라, 발행 쪽 버그도 이 테스트에서 같이 잡힌다.
-     * (구독자가 없어도 publishProject 는 store 에 저장한다)
+     * 재연결 시 Last-Event-ID(5) 이후 이벤트만 재생하는지 확인한다.
+     * 46 = connect 1 + 6~50번 45개. (2 면 resync 로 빠짐, 51 이면 처음부터 재생)
+     * 버퍼는 publishProject 로 채워 발행 경로까지 같이 검증한다.
      */
     @Test
     void subscribeProject_replaysEventsAfterLastEventId() {
@@ -157,27 +141,8 @@ class EventServiceTest {
     }
 
     /**
-     * 놓친 이벤트가 버퍼에서 이미 밀려났으면 재생 대신 resync 를 보내는지 확인한다.
-     *
-     * 버퍼는 최근 100개만 들고 있어서 200번 발행하면 101~200번만 남는다.
-     * 클라이언트는 5번까지 받았으니 6~100번이 비는데, 이건 재생으로 채울 수 없다.
-     * 남은 101~200번만 보내면 클라이언트는 중간이 빈 줄 모르고 넘어가므로
-     * resync 로 "전체를 다시 조회하라"고 알려야 한다.
-     *
-     * 횟수가 아니라 이벤트 이름으로 검증한다.
-     * sendCount 가 2인 것만 보면 connect + "아무 이벤트 1개" 여도 통과해서, 정말 resync 를 보냈는지는 모른다.
-     *
-     * contains("resync") 가 아니라 containsExactly("connect", "resync") 인 이유:
-     * resync 를 보낸 뒤 return 이 빠져 재생까지 이어지면 [connect, resync, TASK_CREATED × 100] 이 되는데,
-     * contains 는 resync 가 어딘가에 있기만 하면 통과해서 이걸 놓친다.
-     * containsExactly 는 "정확히 이 둘만, 이 순서로" 라서 개수·순서·이름을 한 번에 확인한다.
-     * 실패하면 메시지에 실제 목록이 찍혀서 무엇이 왔는지도 바로 보인다.
-     *
-     * resync 조건 자체가 빠지면 버퍼에 남은 101~200번을 재생해 [connect, TASK_CREATED × 100] 이 된다.
-     *
-     * 한계: store 가 비어 있어도(가장 오래된 id 가 null) resync 로 빠지므로
-     * 이 테스트만으로는 "구멍이 있어서 resync" 와 "발행이 저장을 안 해서 resync" 를 구분하지 못한다.
-     * 발행 쪽 문제는 subscribeProject_replaysEventsAfterLastEventId 가 잡아준다.
+     * 놓친 이벤트(6~100번)가 버퍼에서 밀려났으면 재생 대신 resync 를 보내는지 확인한다.
+     * containsExactly 라서 resync 뒤에 재생이 이어지는 실수(return 누락)도 잡는다.
      */
     @Test
     void subscribeProject_sendsResyncWhenMissedEventsFellOutOfBuffer() {
@@ -191,28 +156,19 @@ class EventServiceTest {
     }
 
     /*
-     * 다음 단계: 서버 재시작 후 재연결하면 resync 를 보내는지 확인한다.
-     * 바로 위 테스트와 반대 방향 — 클라이언트가 버퍼보다 뒤처진 게 아니라 최신보다 앞서 있는 경우.
+     * 다음 단계: subscribeProject_sendsResyncWhenLastEventIdIsAheadOfLatestEvent
+     * 서버 재시작으로 id 가 1부터 다시 매겨진 경우. 위 테스트와 반대로 클라이언트가 최신보다 앞서 있다.
      *
-     * subscribeProject_sendsResyncWhenLastEventIdIsAheadOfLatestEvent
-     *
-     * given  - 새 서비스(= 재시작 직후)에서 3번 발행 (id 1, 2, 3)
-     * when   - Last-Event-ID = "57" 로 구독 (재시작 전에 57번까지 받은 클라이언트)
-     * then   - eventNames 가 정확히 [connect, resync] 다 (containsExactly)
-     *
-     * 이 테스트는 지금 코드에서 실패한다([connect] 만 온다). 실패를 먼저 확인한 뒤 고친다.
-     * 이벤트 id 가 메모리에 있어서 재시작하면 1부터 다시 매겨지는데,
-     * replayOrResync 는 가장 오래된 id(1) > 57 + 1 이 거짓이라 resync 를 안 보내고
-     * findAfter(57) 은 빈 목록이라 아무것도 보내지 않는다. → 1~3번을 조용히 놓친다.
+     * given  - 새 서비스에서 3번 발행 (id 1~3)
+     * when   - Last-Event-ID = "57" 로 구독
+     * then   - eventNames 가 [connect, resync]
+     * 지금 코드에선 [connect] 만 와서 실패한다. 실패 확인 후 replayOrResync 조건을 고친다.
      *
      * 이후 후보
-     * - Last-Event-ID 가 null 이면 재생하지 않는다 (첫 연결)
-     * - 숫자가 아닌 Last-Event-ID 가 와도 예외 없이 첫 연결처럼 처리한다
-     * - 경계: 빠진 게 없으면 버퍼가 밀렸어도 재생한다
-     *   (101번 발행 → 버퍼 2~101번, "1" 로 구독 → connect + TASK_CREATED 100개.
-     *    resync 조건의 + 1 이 빠지면 resync 로 빠져 [connect, resync] 가 된다)
-     * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
-     *   (assertThatCode(() -> ...).doesNotThrowAnyException())
-     * - TaskService 가 태스크 변경 시 ProjectEvent 를 발행하는지 (Mockito 필요)
+     * - Last-Event-ID 가 null 이면 재생하지 않는다
+     * - 숫자가 아닌 Last-Event-ID 는 첫 연결처럼 처리한다
+     * - 경계: 101번 발행 후 "1" 로 구독하면 빠진 게 없으니 재생한다
+     * - 구독자 없는 프로젝트에 발행해도 예외가 나지 않는다
+     * - TaskService 가 ProjectEvent 를 발행하는지 (Mockito)
      */
 }
