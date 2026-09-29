@@ -116,27 +116,6 @@ class EventServiceTest {
             Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
         }
     }
-    
-    /**
-     * 연결이 끊긴(send 가 IOException) emitter 가 구독 목록에서 제거되는지 확인한다.
-     * 2 = connect 1 + 1차 발행 1(예외 → 제거) + 2차 발행 0. 제거가 안 되면 3 이 된다.
-     * (Mockito 는 예외를 던진 호출도 기록한다)
-     */
-    @Test
-    void publishProject_removesEmitterWhenSendFails() throws IOException {
-        SseEmitter emitter = Mockito.mock(SseEmitter.class);
-        EventService eventService = new EventService(new ProjectEventStore()) {
-            @Override
-            protected SseEmitter createSseEmitter() { return emitter; };
-        };
-        eventService.subscribeProject("project-1", null);
-        Mockito.doThrow(new IOException("연결 끊김"))
-                        .when(emitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
-        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
-        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
-        Mockito.verify(emitter, Mockito.times(2))
-                .send(Mockito.any(SseEmitter.SseEventBuilder.class));
-    }
 
     @Nested
     @DisplayName("재연결")
@@ -180,28 +159,57 @@ class EventServiceTest {
         }
     }
 
-    /**
-     * 이미 끝난 연결 하나 때문에 다른 구독자가 이벤트를 못 받으면 안 된다.
-     * 끝난 emitter 는 Mockito mock 으로 만들어 send 할 때 IllegalStateException 을 던지게 한다.
-     * liveEmitter 는 connect + TASK_CREATED 로 2번 받아야 한다.
-     */
-    @Test
-    void publishProject_keepsSendingToOthersWhenEmitterAlreadyCompleted() throws IOException {
-        SseEmitter completedEmitter = Mockito.mock(SseEmitter.class);
-        SseEmitter liveEmitter = Mockito.mock(SseEmitter.class);
-        Iterator<SseEmitter> emitters = List.of(completedEmitter, liveEmitter).iterator();
-        EventService eventService = new EventService(new ProjectEventStore()) {
-            @Override
-            protected SseEmitter createSseEmitter() {
-                return emitters.next();
-            }
-        };
-        eventService.subscribeProject("project-1", null);
-        eventService.subscribeProject("project-1", null);
-        Mockito.doThrow(new IllegalStateException("이미 끝난 연결"))
-                .when(completedEmitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
-        Assertions.assertThatCode(() -> eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터"))
-                .doesNotThrowAnyException();
-        Mockito.verify(liveEmitter, Mockito.times(2)).send(Mockito.any(SseEmitter.SseEventBuilder.class));
+    @Nested
+    @DisplayName("끊긴 연결 처리")
+    class HandleBrokenConnection {
+        /** 넘긴 emitter 를 구독 순서대로 돌려주는 EventService. */
+        EventService eventServiceWith(SseEmitter... emitters) {
+            Iterator<SseEmitter> iterator = List.of(emitters).iterator();
+            return new EventService(new ProjectEventStore()) {
+                @Override
+                protected SseEmitter createSseEmitter() {
+                    return iterator.next();
+                }
+            };
+        }
+
+        /**
+         * 연결이 끊긴(send 가 IOException) emitter 가 구독 목록에서 제거되는지 확인한다.
+         * 2 = connect 1 + 1차 발행 1(예외 → 제거) + 2차 발행 0. 제거가 안 되면 3 이 된다.
+         * (Mockito 는 예외를 던진 호출도 기록한다)
+         */
+        @Test
+        @DisplayName("전송에 실패한 연결은 구독 목록에서 제거한다")
+        void publishProject_removesEmitterWhenSendFails() throws IOException {
+            SseEmitter emitter = Mockito.mock(SseEmitter.class);
+            EventService eventService = eventServiceWith(emitter);
+            eventService.subscribeProject("project-1", null);
+            Mockito.doThrow(new IOException("연결 끊김"))
+                    .when(emitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
+            eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+            eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+            Mockito.verify(emitter, Mockito.times(2))
+                    .send(Mockito.any(SseEmitter.SseEventBuilder.class));
+        }
+
+        /**
+         * 이미 끝난 연결 하나 때문에 다른 구독자가 이벤트를 못 받으면 안 된다.
+         * 끝난 emitter 는 Mockito mock 으로 만들어 send 할 때 IllegalStateException 을 던지게 한다.
+         * liveEmitter 는 connect + TASK_CREATED 로 2번 받아야 한다.
+         */
+        @Test
+        @DisplayName("끝난 연결이 섞여 있어도 나머지 구독자에게 계속 보낸다")
+        void publishProject_keepsSendingToOthersWhenEmitterAlreadyCompleted() throws IOException {
+            SseEmitter completedEmitter = Mockito.mock(SseEmitter.class);
+            SseEmitter liveEmitter = Mockito.mock(SseEmitter.class);
+            EventService eventService = eventServiceWith(completedEmitter, liveEmitter);
+            eventService.subscribeProject("project-1", null);
+            eventService.subscribeProject("project-1", null);
+            Mockito.doThrow(new IllegalStateException("이미 끝난 연결"))
+                    .when(completedEmitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
+            Assertions.assertThatCode(() -> eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터"))
+                    .doesNotThrowAnyException();
+            Mockito.verify(liveEmitter, Mockito.times(2)).send(Mockito.any(SseEmitter.SseEventBuilder.class));
+        }
     }
 }
