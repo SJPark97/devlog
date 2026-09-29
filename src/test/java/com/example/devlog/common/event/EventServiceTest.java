@@ -21,11 +21,9 @@ class EventServiceTest {
      */
     static class RecordingEmitter extends SseEmitter {
         int sendCount = 0;
-        boolean failOnSend = false;
         List<String> eventNames = new ArrayList<>();
-        boolean alreadyCompleted = false;
         @Override
-        public void send(@NonNull SseEventBuilder builder) throws IOException {
+        public void send(@NonNull SseEventBuilder builder) {
             sendCount++;
             for (DataWithMediaType piece : builder.build()) {
                 if (piece.getData() instanceof String text) {
@@ -35,8 +33,6 @@ class EventServiceTest {
                             .forEach(eventNames::add);
                 }
             }
-            if (failOnSend) throw new IOException("연결 끊김");
-            if (alreadyCompleted) throw new IllegalStateException("이미 끝난 연결");
         }
     }
 
@@ -108,24 +104,24 @@ class EventServiceTest {
     }
 
     /**
-     * 연결이 끊긴 emitter 가 구독 목록에서 제거되는지 확인한다.
-     * publishProject 의 catch 블록이 검증 대상 — 평소에는 실행되지 않는 경로라 버그가 숨기 쉽다.
-     *
-     * 흐름: 구독 1(connect 성공) → failOnSend on → 1차 발행 2(호출됨, 예외 → 제거)
-     *       → 2차 발행 2(제거돼서 호출조차 안 됨)
-     *
-     * 마지막 2가 핵심. 제거가 안 되면 3이 되어 실패한다.
-     * RecordingEmitter 가 던지기 전에 sendCount 를 먼저 올리는 이유도 이것.
-     * 순서가 반대면 "제거돼서 2"인지 "세기 전에 예외라서 2"인지 구분할 수 없어 테스트가 무의미해진다.
+     * 연결이 끊긴(send 가 IOException) emitter 가 구독 목록에서 제거되는지 확인한다.
+     * 2 = connect 1 + 1차 발행 1(예외 → 제거) + 2차 발행 0. 제거가 안 되면 3 이 된다.
+     * (Mockito 는 예외를 던진 호출도 기록한다)
      */
     @Test
-    void publishProject_removesEmitterWhenSendFails() {
-        TestEventService eventService = new TestEventService();
-        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project-1", null);
-        emitter.failOnSend = true;
+    void publishProject_removesEmitterWhenSendFails() throws IOException {
+        SseEmitter emitter = Mockito.mock(SseEmitter.class);
+        EventService eventService = new EventService(new ProjectEventStore()) {
+            @Override
+            protected SseEmitter createSseEmitter() { return emitter; };
+        };
+        eventService.subscribeProject("project-1", null);
+        Mockito.doThrow(new IOException("연결 끊김"))
+                        .when(emitter).send(Mockito.any(SseEmitter.SseEventBuilder.class));
         eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
         eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
-        Assertions.assertThat(emitter.sendCount).isEqualTo(2);
+        Mockito.verify(emitter, Mockito.times(2))
+                .send(Mockito.any(SseEmitter.SseEventBuilder.class));
     }
 
     /**
