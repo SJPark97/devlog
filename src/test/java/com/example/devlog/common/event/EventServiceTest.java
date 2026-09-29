@@ -139,8 +139,35 @@ class EventServiceTest {
         Assertions.assertThat(emitter.sendCount).isEqualTo(46);
     }
 
+    /**
+     * 놓친 이벤트가 버퍼에서 이미 밀려났으면 재생 대신 resync 를 보내는지 확인한다.
+     *
+     * 버퍼는 최근 100개만 들고 있어서 200번 발행하면 101~200번만 남는다.
+     * 클라이언트는 5번까지 받았으니 6~100번이 비는데, 이건 재생으로 채울 수 없다.
+     * 남은 101~200번만 보내면 클라이언트는 중간이 빈 줄 모르고 넘어가므로
+     * resync 로 "전체를 다시 조회하라"고 알려야 한다.
+     *
+     * sendCount 가 2인 이유: connect 1번 + resync 1번.
+     * resync 조건이 빠져서 버퍼에 남은 것만 재생하면 101(connect + 100개)이 나온다.
+     *
+     * 한계: store 가 비어 있어도(가장 오래된 id 가 null) resync 로 빠지므로
+     * 이 테스트만으로는 "구멍이 있어서 resync" 와 "발행이 저장을 안 해서 resync" 를 구분하지 못한다.
+     * 발행 쪽 문제는 subscribeProject_replaysEventsAfterLastEventId 가 잡아준다.
+     */
+    @Test
+    void subscribeProject_sendsResyncWhenMissedEventsFellOutOfBuffer() {
+        TestEventService eventService = new TestEventService();
+        int n = 200;
+        for (int i = 1; i <= n; i++) {
+            eventService.publishProject("project", ProjectEventType.TASK_CREATED, Map.of("data", "테스트 태스크", "cnt", i));
+        };
+        RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
+        Assertions.assertThat(emitter.sendCount).isEqualTo(2);
+    }
+
     /*
      * 다음 단계: 서버 재시작 후 재연결하면 resync 를 보내는지 확인한다.
+     * 바로 위 테스트와 반대 방향 — 클라이언트가 버퍼보다 뒤처진 게 아니라 최신보다 앞서 있는 경우.
      *
      * subscribeProject_sendsResyncWhenLastEventIdIsAheadOfLatestEvent
      *
@@ -156,8 +183,9 @@ class EventServiceTest {
      * 이후 후보
      * - Last-Event-ID 가 null 이면 재생하지 않는다 (첫 연결)
      * - 숫자가 아닌 Last-Event-ID 가 와도 예외 없이 첫 연결처럼 처리한다
-     * - 버퍼에서 밀려나 구멍이 생긴 경우 resync 를 보낸다
-     *   (102번 발행 → 버퍼에 3~102번만 남음 → "1" 로 구독하면 2번이 빈다)
+     * - 경계: 빠진 게 없으면 버퍼가 밀렸어도 재생한다
+     *   (101번 발행 → 버퍼 2~101번, "1" 로 구독 → connect + 100개 = 101.
+     *    resync 조건의 + 1 이 빠지면 resync 로 빠져 2 가 나온다)
      * - 구독자가 없는 프로젝트에 발행해도 예외가 나지 않는다
      *   (assertThatCode(() -> ...).doesNotThrowAnyException())
      * - TaskService 가 태스크 변경 시 ProjectEvent 를 발행하는지 (Mockito 필요)
