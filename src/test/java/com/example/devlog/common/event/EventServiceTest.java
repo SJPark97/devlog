@@ -154,21 +154,4 @@ class EventServiceTest {
         RecordingEmitter emitter = (RecordingEmitter) eventService.subscribeProject("project", "5");
         Assertions.assertThat(emitter.eventNames).containsExactly("connect", "resync");
     }
-
-    /*
-     * 다음 단계: subscribeProject_sendsResyncWhenLastEventIdIsAheadOfLatestEvent
-     * 서버 재시작으로 id 가 1부터 다시 매겨진 경우. 위 테스트와 반대로 클라이언트가 최신보다 앞서 있다.
-     *
-     * given  - 새 서비스에서 3번 발행 (id 1~3)
-     * when   - Last-Event-ID = "57" 로 구독
-     * then   - eventNames 가 [connect, resync]
-     * 지금 코드에선 [connect] 만 와서 실패한다. 실패 확인 후 replayOrResync 조건을 고친다.
-     *
-     * 이후 후보
-     * - Last-Event-ID 가 null 이면 재생하지 않는다
-     * - 숫자가 아닌 Last-Event-ID 는 첫 연결처럼 처리한다
-     * - 경계: 101번 발행 후 "1" 로 구독하면 빠진 게 없으니 재생한다
-     * - 구독자 없는 프로젝트에 발행해도 예외가 나지 않는다
-     * - TaskService 가 ProjectEvent 를 발행하는지 (Mockito)
-     */
 }
