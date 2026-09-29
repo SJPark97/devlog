@@ -2,6 +2,9 @@ package com.example.devlog.common.event;
 
 import org.assertj.core.api.Assertions;
 import org.jspecify.annotations.NonNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -58,51 +61,62 @@ class EventServiceTest {
         }
     }
 
-    /**
-     * 구독하면 emitter 를 돌려주는지 확인한다.
-     * Spring 컨텍스트 없이 new 로 만들어 검증하므로 1초 안에 끝난다.
-     * (@SpringBootTest 를 붙이면 서버 전체가 떠서 불필요하게 느려진다)
-     */
-    @Test
-    void subscribeProject_returnsEmitter() {
-        TestEventService eventService = new TestEventService();
-        SseEmitter emitter = eventService.subscribeProject("project-1", null);
-        Assertions.assertThat(emitter).isNotNull();
-    }
+    @Nested
+    @DisplayName("구독과 발행")
+    class SubscribeAndPublish {
+        TestEventService eventService;
 
-    /**
-     * 같은 프로젝트를 구독한 사람이 여러 명이면 전원에게 이벤트가 가는지 확인한다.
-     * curl 로는 확인하기 번거로웠던 부분.
-     *
-     * sendCount 가 2인 이유: 구독 시 connect 1번 + TASK_CREATED 1번.
-     */
-    @Test
-    void publishProject_sendsEventToAllSubscribersOfProject() {
-        TestEventService eventService = new TestEventService();
-        String projectId = "project-1";
-        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
-        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
-        eventService.publishProject(projectId, ProjectEventType.TASK_CREATED, "테스트 데이터");
-        Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
-        Assertions.assertThat(emitter2.sendCount).isEqualTo(2);
-    }
+        @BeforeEach
+        void setUp() {
+            eventService = new TestEventService();
+        }
 
-    /**
-     * 프로젝트별 격리 검증. 이 기능의 핵심이라 반드시 지켜져야 한다.
-     *
-     * project-2 구독자의 sendCount 가 0이 아니라 1인 이유: 구독 시 connect 는 받기 때문.
-     * 여기서 2가 나오면 다른 프로젝트 이벤트까지 받고 있다는 뜻이다.
-     */
-    @Test
-    void publishProject_doesNotSendEventToOtherProjectSubscribers() {
-        TestEventService eventService = new TestEventService();
-        RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject("project-1", null);
-        RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject("project-2", null);
-        eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
-        Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
-        Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
-    }
+        /**
+         * 구독하면 emitter 를 돌려주는지 확인한다.
+         * Spring 컨텍스트 없이 new 로 만들어 검증하므로 1초 안에 끝난다.
+         * (@SpringBootTest 를 붙이면 서버 전체가 떠서 불필요하게 느려진다)
+         */
+        @Test
+        @DisplayName("구독하면 emitter 를 돌려준다")
+        void subscribeProject_returnsEmitter() {
+            SseEmitter emitter = eventService.subscribeProject("project-1", null);
+            Assertions.assertThat(emitter).isNotNull();
+        }
 
+        /**
+         * 같은 프로젝트를 구독한 사람이 여러 명이면 전원에게 이벤트가 가는지 확인한다.
+         * curl 로는 확인하기 번거로웠던 부분.
+         *
+         * sendCount 가 2인 이유: 구독 시 connect 1번 + TASK_CREATED 1번.
+         */
+        @Test
+        @DisplayName("같은 프로젝트 구독자 모두에게 이벤트를 보낸다")
+        void publishProject_sendsEventToAllSubscribersOfProject() {
+            String projectId = "project-1";
+            RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
+            RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject(projectId, null);
+            eventService.publishProject(projectId, ProjectEventType.TASK_CREATED, "테스트 데이터");
+            Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
+            Assertions.assertThat(emitter2.sendCount).isEqualTo(2);
+        }
+
+        /**
+         * 프로젝트별 격리 검증. 이 기능의 핵심이라 반드시 지켜져야 한다.
+         *
+         * project-2 구독자의 sendCount 가 0이 아니라 1인 이유: 구독 시 connect 는 받기 때문.
+         * 여기서 2가 나오면 다른 프로젝트 이벤트까지 받고 있다는 뜻이다.
+         */
+        @Test
+        @DisplayName("다른 프로젝트 구독자에게는 이벤트를 보내지 않는다")
+        void publishProject_doesNotSendEventToOtherProjectSubscribers() {
+            RecordingEmitter emitter1 = (RecordingEmitter) eventService.subscribeProject("project-1", null);
+            RecordingEmitter emitter2 = (RecordingEmitter) eventService.subscribeProject("project-2", null);
+            eventService.publishProject("project-1", ProjectEventType.TASK_CREATED, "테스트 데이터");
+            Assertions.assertThat(emitter1.sendCount).isEqualTo(2);
+            Assertions.assertThat(emitter2.sendCount).isEqualTo(1);
+        }
+    }
+    
     /**
      * 연결이 끊긴(send 가 IOException) emitter 가 구독 목록에서 제거되는지 확인한다.
      * 2 = connect 1 + 1차 발행 1(예외 → 제거) + 2차 발행 0. 제거가 안 되면 3 이 된다.
