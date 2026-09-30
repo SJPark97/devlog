@@ -1,5 +1,6 @@
 package com.example.devlog.project;
 
+import com.example.devlog.common.exception.BusinessException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,23 @@ class ProjectTest {
         project.updateStatus(ProjectStatus.ARCHIVED);
         Assertions.assertThat(project)
                 .returns(ProjectStatus.ARCHIVED, Project::getStatus)
+                .doesNotReturn(updateTime, Project::getUpdatedAt);
+    }
+
+    /**
+     * 이름·설명을 바꾸면 두 필드가 새 값이 되고 수정 시각이 기록되는지 검증한다.
+     * 생성 직후 updatedAt 은 null 이라, 변경 전 값과 달라졌다면 update 가 채운 것이다.
+     */
+    @Test
+    @DisplayName("이름과 설명을 바꾸면 새 값이 되고 수정 시각이 기록된다")
+    void update_changesFields() {
+        String changedProjectName = "프로젝트명 변경";
+        String changedDescription = "설명 변경";
+        LocalDateTime updateTime = project.getUpdatedAt();
+        project.update(changedProjectName, changedDescription);
+        Assertions.assertThat(project)
+                .returns(changedProjectName, Project::getName)
+                .returns(changedDescription, Project::getDescription)
                 .doesNotReturn(updateTime, Project::getUpdatedAt);
     }
 }
