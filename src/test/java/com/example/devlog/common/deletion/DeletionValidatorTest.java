@@ -59,4 +59,17 @@ class DeletionValidatorTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DELETED_PROJECT);
     }
+
+    /**
+     * 프로젝트만 삭제됐을 때 가장 아래인 댓글에서 확인해도 두 단계 위 프로젝트의 코드가 나오는지 검증한다.
+     * 댓글 → 태스크 → 프로젝트로 deletionCheck 가 끝까지 이어져야 통과하므로, 중간 엔티티가 부모를 빠뜨리면 실패한다.
+     */
+    @Test
+    @DisplayName("댓글에서 확인해도 프로젝트가 삭제됐으면 DELETED_PROJECT 로 막는다")
+    void validate_throwsDeletedProject() {
+        project.delete();
+        Assertions.assertThatThrownBy(() -> DeletionValidator.validateNotDeleted(taskComment.deletionCheck()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DELETED_PROJECT);
+    }
 }
