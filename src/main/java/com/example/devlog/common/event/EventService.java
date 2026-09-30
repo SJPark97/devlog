@@ -85,8 +85,17 @@ public class EventService {
         }
     }
 
+    public void closeProjectEmitters(String projectId) {
+        List<SseEmitter> emitters = projectEmitters.remove(projectId);
+        if (emitters == null) return;
+        for (SseEmitter emitter: emitters) {
+            emitter.complete();
+        }
+    }
+
     @TransactionalEventListener
     public void handleProjectEvent(ProjectEvent event) {
         publishProject(event.projectId(), event.type(), event.data());
+        if (event.type() == ProjectEventType.PROJECT_DELETED) closeProjectEmitters(event.projectId());
     }
 }
