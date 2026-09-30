@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 
 class ProjectTest {
     String projectName = "프로젝트";
@@ -40,5 +42,19 @@ class ProjectTest {
         Assertions.assertThat(project)
                 .returns(true, Project::isDeleted)
                 .doesNotReturn(null, Project::getDeletedAt);
+    }
+
+    /**
+     * 상태를 바꾸면 status 가 새 값이 되고 수정 시각이 기록되는지 검증한다.
+     * 생성 직후 updatedAt 은 null 이라, 변경 전 값과 달라졌다면 updateStatus 가 채운 것이다. 초기값 ACTIVE 만 아니면 되므로 ARCHIVED 를 썼다.
+     */
+    @Test
+    @DisplayName("상태를 바꾸면 새 상태가 되고 수정 시각이 기록된다")
+    void updateStatus_changesStatus() {
+        LocalDateTime updateTime = project.getUpdatedAt();
+        project.updateStatus(ProjectStatus.ARCHIVED);
+        Assertions.assertThat(project)
+                .returns(ProjectStatus.ARCHIVED, Project::getStatus)
+                .doesNotReturn(updateTime, Project::getUpdatedAt);
     }
 }
