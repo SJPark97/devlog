@@ -1,5 +1,7 @@
 package com.example.devlog.project;
 
+import com.example.devlog.common.deletion.DeletionCheck;
+import com.example.devlog.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -70,5 +72,9 @@ public class Project {
     public void updateStatus(ProjectStatus status) {
         this.status = status;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public DeletionCheck deletionCheck() {
+        return new DeletionCheck(deleted, null, ErrorCode.DELETED_PROJECT);
     }
 }

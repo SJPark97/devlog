@@ -1,5 +1,7 @@
 package com.example.devlog.task;
 
+import com.example.devlog.common.deletion.DeletionCheck;
+import com.example.devlog.common.exception.ErrorCode;
 import com.example.devlog.project.Project;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -82,5 +84,9 @@ public class Task {
         this.deletedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         this.deleted = true;
+    }
+
+    public DeletionCheck deletionCheck() {
+        return new DeletionCheck(deleted, project.deletionCheck(), ErrorCode.DELETED_TASK);
     }
 }

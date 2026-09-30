@@ -1,5 +1,7 @@
 package com.example.devlog.taskcomment;
 
+import com.example.devlog.common.deletion.DeletionCheck;
+import com.example.devlog.common.exception.ErrorCode;
 import com.example.devlog.task.Task;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,7 +31,8 @@ public class TaskComment {
     @Column(nullable = false, length = 1000)
     private String content;
 
-    private Boolean deleted;
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
+    private boolean deleted;
     private LocalDateTime deletedAt;
 
     @Column(nullable = false)
@@ -62,5 +65,9 @@ public class TaskComment {
         this.deleted = true;
         this.deletedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public DeletionCheck deletionCheck() {
+        return new DeletionCheck(deleted, task.deletionCheck(), ErrorCode.DELETED_TASK_COMMENT);
     }
 }

@@ -33,7 +33,8 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getTasks(String projectId) {
-        List<Task> tasks = taskRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(projectId);
+        Project project = projectFinder.getProjectById(projectId);
+        List<Task> tasks = taskRepository.findByProjectIdAndDeletedFalseOrderByCreatedAtDesc(project.getId());
 
         return tasks.stream()
                 .map(TaskResponse::from)
