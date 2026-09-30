@@ -1,10 +1,10 @@
 package com.example.devlog.project;
 
-import com.example.devlog.project.dto.ProjectCreateRequest;
-import com.example.devlog.project.dto.ProjectResponse;
-import com.example.devlog.project.dto.ProjectStatusUpdateRequest;
-import com.example.devlog.project.dto.ProjectUpdateRequest;
+import com.example.devlog.common.event.ProjectEvent;
+import com.example.devlog.common.event.ProjectEventType;
+import com.example.devlog.project.dto.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,6 +19,7 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectFinder projectFinder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ProjectResponse createProject(ProjectCreateRequest request) {
@@ -84,6 +85,9 @@ public class ProjectService {
     public void deleteProject(String id) {
         Project project = projectFinder.getProjectById(id);
         project.delete();
+
+        Object data = new ProjectDeletedResponse(project.getId());
+        eventPublisher.publishEvent(new ProjectEvent(project.getId(), ProjectEventType.PROJECT_DELETED, data));
     }
 
     @Transactional
