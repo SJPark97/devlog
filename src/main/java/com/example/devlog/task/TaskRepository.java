@@ -10,7 +10,7 @@ public interface TaskRepository extends JpaRepository<Task, String> {
     @Query("""
             select t.status, count(t)
             from Task t
-            where t.deleted = false
+            where t.deleted = false and t.project.deleted = false
             group by t.status
             """)
     List<Object[]> countByStatusGroupByStatus();
