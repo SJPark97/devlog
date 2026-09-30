@@ -45,4 +45,18 @@ class DeletionValidatorTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DELETED_TASK);
     }
+
+    /**
+     * 프로젝트와 태스크가 둘 다 삭제됐으면 조상인 프로젝트의 코드가 나오는지 검증한다.
+     * validator 가 부모를 먼저 재귀 확인하기 때문이며, 자기 자신을 먼저 보도록 순서가 바뀌면 DELETED_TASK 가 나와 실패한다.
+     */
+    @Test
+    @DisplayName("프로젝트와 태스크가 모두 삭제됐으면 조상인 DELETED_PROJECT 로 막는다")
+    void validate_prefersDeletedProject() {
+        project.delete();
+        task.delete();
+        Assertions.assertThatThrownBy(() -> DeletionValidator.validateNotDeleted(task.deletionCheck()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DELETED_PROJECT);
+    }
 }
