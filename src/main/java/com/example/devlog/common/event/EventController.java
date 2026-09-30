@@ -1,5 +1,7 @@
 package com.example.devlog.common.event;
 
+import com.example.devlog.project.Project;
+import com.example.devlog.project.ProjectFinder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class EventController {
 
     private final EventService eventService;
+    private final ProjectFinder projectFinder;
 
     @Operation(
             summary = "프로젝트 이벤트 구독",
@@ -27,6 +30,7 @@ public class EventController {
             @Parameter(description = "프로젝트 ID", example = "f47ac10b-58cc-4372-a567-0e02b2c3d479")
             @PathVariable String projectId
     ) {
-        return eventService.subscribeProject(projectId, lastEventId);
+        Project project = projectFinder.getProjectById(projectId);
+        return eventService.subscribeProject(project.getId(), lastEventId);
     }
 }
